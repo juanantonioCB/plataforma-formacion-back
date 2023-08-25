@@ -1,0 +1,46 @@
+include:
+  - project: 'misc/continuous-integration-templates'
+    ref: master
+    file:
+      - 'base/all.yml'
+
+docker-build-dev:
+  variables:
+    DOCKER_TLS_CERTDIR: '/certs'
+  image: docker:latest
+  stage: deploy
+  environment: dev
+  services:
+    - docker:dind
+  before_script:
+    - echo "$DEV_SSHKEY" | tr -d '\r' > id_rsa
+    - chmod 600 id_rsa
+  script:
+    - mkdir storage/.aws
+    - echo "$AWS_ENV_DEV" | tr -d '\r' > storage/.aws/PVK_CloudFront_INCIBE.pem
+    - echo "$DEV_ENV"  > .env
+    - docker build -t incibe_admin:latest .
+    - docker save incibe_admin:latest | bzip2 | ssh -i id_rsa -o stricthostkeychecking=no $DEV_USER@$DEV_SERVER 'bunzip2 | docker load; docker stop incibe_admin; docker rm incibe_admin; docker run --name=incibe_admin --restart=unless-stopped -d -p 127.0.0.1:8242:80/tcp incibe_admin:latest'
+  only:
+    - develop
+
+docker-build-pro:
+  variables:
+    DOCKER_TLS_CERTDIR: '/certs'
+  image: docker:latest
+  stage: deploy
+  environment: pro
+  services:
+    - docker:dind
+  before_script:
+    - echo "$PRO_SSHKEY" | tr -d '\r' > id_rsa
+    - chmod 600 id_rsa
+  script:
+    - mkdir storage/.aws
+    - echo "$AWS_ENV_PRO" | tr -d '\r' > storage/.aws/PVK_CloudFront_INCIBE.pem
+    - echo "$PRO_ENV"  > .env
+    - docker build -t incibe_admin:latest .
+    - docker save incibe_admin:latest | bzip2 | ssh -i id_rsa -o stricthostkeychecking=no $PRO_USER@$PRO_SERVER 'bunzip2 | docker load; docker stop incibe_admin; docker rm incibe_admin; docker run --name=incibe_admin --restart=unless-stopped -d -p 127.0.0.1:8242:80/tcp incibe_admin:latest'
+  only:
+    - main
+
